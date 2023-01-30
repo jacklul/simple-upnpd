@@ -4,13 +4,17 @@
 #include <string.h>
 
 static gchar *xmlFileName = "description.xml";
+static guint *port = 0;
 static int debug;
+static int ipv6;
 static GHashTable *cp_hash;
 
 static GOptionEntry entries[] =
 {
 	{ "debug", 'd', 0, G_OPTION_ARG_NONE, &debug, "debug, don't fork", 0 },
 	{ "xml", 'x', 0, G_OPTION_ARG_FILENAME, &xmlFileName, "upnp description file", 0 },
+	{ "port", 'p', 0, G_OPTION_ARG_INT, &port, "upnp port", 0 },
+	{ "ipv6", '6', 0, G_OPTION_ARG_NONE, &ipv6, "enable IPv6 support", 0 },
 	{ NULL }
 };
 
@@ -75,6 +79,7 @@ int main(int argc, char **argv)
 	GMainLoop *main_loop;
 	GError *error = NULL;
 	GUPnPContextManager *context_manager;
+	GUPnPContextManager *context_manager_ipv6;
 	pid_t pid;
 
 #if !GLIB_CHECK_VERSION(2,35,0)
@@ -92,13 +97,28 @@ int main(int argc, char **argv)
 									g_object_unref, g_object_unref);
 
 #ifdef GUPNP_1_2
-	context_manager = gupnp_context_manager_create(0); // Since 0.17.2
+	context_manager = gupnp_context_manager_create_full(GSSDP_UDA_VERSION_1_0, G_SOCKET_FAMILY_IPV4, (guint) port);
+
+	if (ipv6) {
+		context_manager_ipv6 = gupnp_context_manager_create_full(GSSDP_UDA_VERSION_1_0, G_SOCKET_FAMILY_IPV6, (guint) port);
+	}
 #else
-	context_manager = gupnp_context_manager_new(NULL, 0); // Since 0.13.0
+	context_manager = gupnp_context_manager_new(NULL, (guint) port);
+
+	if (ipv6) {
+		g_print("IPv6 is not supported when simple-upnpd is build with gupnp-1.0\n");
+		ipv6 = 0;
+	}
 #endif
 	g_assert(context_manager != NULL);
 	g_signal_connect(context_manager, "context-available", G_CALLBACK(on_context_available), NULL);
 	g_signal_connect(context_manager, "context-unavailable", G_CALLBACK(on_context_unavailable), NULL);
+
+	if (ipv6) {
+		g_assert(context_manager_ipv6 != NULL);
+		g_signal_connect(context_manager_ipv6, "context-available", G_CALLBACK(on_context_available), NULL);
+		g_signal_connect(context_manager_ipv6, "context-unavailable", G_CALLBACK(on_context_unavailable), NULL);
+	}
 
 	if (!debug) {
 		pid = fork();

@@ -15,6 +15,7 @@ This fork adds the ability to specify the port it will be listening on and to al
 ## Requirements
 
 - systemd
+- `libgupnp-1.2-0` or `libgupnp-1.0-4`
 
 ## Installation
 
